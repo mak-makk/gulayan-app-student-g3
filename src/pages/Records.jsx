@@ -22,11 +22,56 @@ function Records() {
   const isInInitialMount = useRef(true);
 
   const handleSearchPlants = async () => {
-    // TODO search from the the backend; in case that all records is not yet loaded
+    try {
+      setIsLoading(true);
+      const res = await api.get('plants', { params: { q: searchTerm, page: 1 } });
+      const payload = res?.data?.data ?? res?.data ?? [];
+      const items = Array.isArray(payload) ? payload : [];
+      setRecords(items);
+
+      const meta = res?.data?.meta;
+      if (meta && typeof meta.current_page !== 'undefined' && typeof meta.last_page !== 'undefined') {
+        setHasMore(meta.current_page < meta.last_page);
+        setCurrentPage(meta.current_page);
+      } else {
+        setHasMore(false);
+        setCurrentPage(1);
+      }
+    } catch (error) {
+      console.error(error);
+      toast.error(error?.message || 'Error searching records.');
+    } finally {
+      setIsLoading(false);
+    }
   }
   const handleLoadRecords = async (page = 1, append = false) => {
-    //TODO: load the data from the database
-    //TODO: implement paginated data loading
+    try {
+      if (append) setIsLoadingMore(true);
+      else setIsLoading(true);
+
+      const res = await api.get('plants', { params: { page } });
+      const payload = res?.data?.data ?? res?.data ?? [];
+      const items = Array.isArray(payload) ? payload : [];
+
+      if (append) {
+        setRecords((prev) => [...(prev || []), ...items]);
+      } else {
+        setRecords(items);
+      }
+
+      const meta = res?.data?.meta;
+      if (meta && typeof meta.current_page !== 'undefined' && typeof meta.last_page !== 'undefined') {
+        setHasMore(meta.current_page < meta.last_page);
+      } else {
+        setHasMore(items.length > 0);
+      }
+    } catch (error) {
+      console.error(error);
+      toast.error(error?.message || 'Error loading records.');
+    } finally {
+      setIsLoading(false);
+      setIsLoadingMore(false);
+    }
   }
   const handleAddRecord = async (formData) => {
     try {
@@ -104,25 +149,31 @@ function Records() {
       }
     }
   }, [loadMore]);
-  // reset pagination when searching
+  // reset pagination and perform debounced backend search when needed
   useEffect(() => {
     if (isInInitialMount.current) {
       isInInitialMount.current = false;
       return;
     }
-    if (isInInitialMount.current) {
-      isInInitialMount.current = false;
-      return;
-    }
-    if (searchTerm) {
-      setCurrentPage(1);
-      setHasMore(false);
-    } else {
-      setCurrentPage(1);
-      setHasMore(true);
-      handleLoadRecords(1, false);
-    }
-  }, [searchTerm]);
+
+    const t = setTimeout(() => {
+      if (searchTerm) {
+        // if not all records are loaded locally, query backend
+        if (hasMore) {
+          handleSearchPlants();
+        } else {
+          // all records loaded locally: rely on local filtering
+          setCurrentPage(1);
+        }
+      } else {
+        setCurrentPage(1);
+        setHasMore(true);
+        handleLoadRecords(1, false);
+      }
+    }, 350);
+
+    return () => clearTimeout(t);
+  }, [searchTerm, hasMore]);
 
   return (
     <div>
