@@ -1,5 +1,5 @@
 import { useState, useEffect, useRef, useCallback } from 'react';
-import { FaSearch, FaPlus, FaEdit, FaTrash } from 'react-icons/fa';
+import { FaSearch, FaPlus, FaEdit, FaTrash, FaChevronLeft, FaChevronRight } from 'react-icons/fa';
 import ModalNewRecord from './records/ModalNewRecord';
 import ModalEditRecord from './records/ModalEditRecord';
 import PlantLoading from '../components/PlantLoading';
@@ -16,21 +16,53 @@ function Records() {
   const [isLoading, setIsLoading] = useState(false);
   //pagination states
   const [currentPage, setCurrentPage] = useState(1);
+  const [totalPages, setTotalPages] = useState(1);
   const [hasMore, setHasMore] = useState(true);
   const [isLoadingMore, setIsLoadingMore] = useState(false);
-  const observerTarget = useRef(null);
   const isInInitialMount = useRef(true);
 
   const handleSearchPlants = async () => {
     // TODO search from the the backend; in case that all records is not yet loaded
   }
   const handleLoadRecords = async (page = 1, append = false) => {
-    //TODO: load the data from the database
-    //TODO: implement paginated data loading
+    try {
+      setIsLoading(page === 1);
+      setIsLoadingMore(append);
+      
+      const response = await api.get('/plants', {
+        params: {
+          page,
+          per_page: 10
+        }
+      });
+      
+      const newRecords = response.data.data || response.data;
+      
+      if (append) {
+        setRecords(prev => [...prev, ...newRecords]);
+      } else {
+        setRecords(newRecords);
+      }
+      
+      // Check if there are more records to load
+      const totalPages = response.data.last_page || response.data.meta?.last_page || 1;
+      const currentPageNum = response.data.current_page || page;
+      setTotalPages(totalPages);
+      setHasMore(currentPageNum < totalPages);
+      setCurrentPage(currentPageNum);
+      
+    } catch (error) {
+      console.error("Error loading records:", error);
+      toast.error("Error loading records.");
+    } finally {
+      setIsLoading(false);
+      setIsLoadingMore(false);
+    }
   }
   const handleAddRecord = async (formData) => {
     try {
-      //TODO: make add new record functional
+      const response = await api.post('/plants', formData);
+      setRecords(prev => [response.data, ...prev]);
       toast.success("New record saved.");
     } catch (error) {
       console.error(error);
@@ -41,7 +73,10 @@ function Records() {
   }
   const handleUpdateRecord = async (data) => {
     try {
-      //TODO make update record functional
+      const response = await api.put(`plants/${data.id}`, data);
+      setRecords(prev => prev.map(record => 
+        record.id === data.id ? response.data : record
+      ));
       toast.success("Plant data updated.");
     } catch (error) {
       console.error(error);
@@ -68,42 +103,18 @@ function Records() {
     record.variety?.toLowerCase().includes(searchTerm.toLowerCase()) ||
     record.seedling_source?.toLowerCase().includes(searchTerm.toLowerCase())
   );
-  const loadMore = useCallback(() => {
-    if (!isLoadingMore && hasMore && !searchTerm) {
-      const nextPage = currentPage + 1;
-      setCurrentPage(nextPage);
-      handleLoadRecords(nextPage, true);
+  const handlePageChange = (page) => {
+    if (page >= 1 && page <= totalPages && page !== currentPage) {
+      setCurrentPage(page);
+      handleLoadRecords(page, false);
     }
-  }, [isLoadingMore, hasMore, currentPage, searchTerm]);
+  };
 
   // initial record loading
   useEffect(() => {
     handleLoadRecords(1, false);
   }, []);
-  // intersection observer for infine scroll
-  useEffect(() => {
-    const observer = new IntersectionObserver(
-      (entries) => {
-        if (entries[0].isIntersecting) {
-          loadMore();
-        }
-      }, { threshold: 0.1 }
-    );
-
-    const currentTarget = observerTarget.current;
-
-    if (currentTarget) {
-      observer.observe(currentTarget);
-    } else {
-      console.log("No target to observer.");
-    }
-
-    return () => {
-      if (currentTarget) {
-        observer.unobserve(currentTarget);
-      }
-    }
-  }, [loadMore]);
+  
   // reset pagination when searching
   useEffect(() => {
     if (isInInitialMount.current) {
@@ -112,6 +123,7 @@ function Records() {
     }
     if (searchTerm) {
       setCurrentPage(1);
+      setTotalPages(1);
       setHasMore(false);
     } else {
       setCurrentPage(1);
@@ -150,7 +162,6 @@ function Records() {
       </div>
 
       {/* Records Table */}
-      {/* TODO implement pagination plants table */}
       <div className="bg-white rounded-lg shadow-md border border-gray-100 overflow-hidden">
         <div className="overflow-x-auto max-h-[580px] overflow-y-auto">
           <table className="relative w-full">
@@ -243,6 +254,63 @@ function Records() {
         {!hasMore && records.length > 0 && !searchTerm && (
           <div className="text-center py-4 text-gray-400 text-sm border-t border-gray-100">
             No more records to load
+          </div>
+        )}
+
+        {/* Pagination */}
+        {totalPages > 1 && !searchTerm && (
+          <div className="flex items-center justify-between px-6 py-4 border-t border-gray-100 bg-gray-50">
+            <div className="text-sm text-gray-600">
+              Page {currentPage} of {totalPages}
+            </div>
+            <div className="flex items-center gap-2">
+              <button
+                onClick={() => handlePageChange(currentPage - 1)}
+                disabled={currentPage === 1}
+                className="p-2 rounded-lg border border-gray-300 bg-white text-gray-600 
+                  hover:bg-gray-100 disabled:opacity-50 disabled:cursor-not-allowed transition-colors cursor-pointer"
+                title="Previous page"
+              >
+                <FaChevronLeft size={14} />
+              </button>
+              
+              {/* Page numbers */}
+              <div className="flex items-center gap-1">
+                {Array.from({ length: totalPages }, (_, i) => i + 1)
+                  .filter(page => {
+                    // Show first page, last page, and pages around current page
+                    return page === 1 || page === totalPages || 
+                           Math.abs(page - currentPage) <= 1;
+                  })
+                  .map((page, index, arr) => (
+                    <div key={page} className="flex items-center">
+                      {index > 0 && arr[index - 1] !== page - 1 && (
+                        <span className="px-2 text-gray-400">...</span>
+                      )}
+                      <button
+                        onClick={() => handlePageChange(page)}
+                        className={`min-w-[36px] h-9 px-3 rounded-lg text-sm font-medium transition-colors cursor-pointer
+                          ${currentPage === page 
+                            ? 'bg-green-600 text-white' 
+                            : 'bg-white border border-gray-300 text-gray-600 hover:bg-gray-100'
+                          }`}
+                      >
+                        {page}
+                      </button>
+                    </div>
+                  ))}
+              </div>
+
+              <button
+                onClick={() => handlePageChange(currentPage + 1)}
+                disabled={currentPage === totalPages}
+                className="p-2 rounded-lg border border-gray-300 bg-white text-gray-600 
+                  hover:bg-gray-100 disabled:opacity-50 disabled:cursor-not-allowed transition-colors cursor-pointer"
+                title="Next page"
+              >
+                <FaChevronRight size={14} />
+              </button>
+            </div>
           </div>
         )}
       </div>
