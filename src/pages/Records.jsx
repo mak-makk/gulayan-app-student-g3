@@ -110,6 +110,10 @@ function Records() {
       isInInitialMount.current = false;
       return;
     }
+    if (isInInitialMount.current) {
+      isInInitialMount.current = false;
+      return;
+    }
     if (searchTerm) {
       setCurrentPage(1);
       setHasMore(false);
@@ -172,7 +176,7 @@ function Records() {
                 isLoading && records.length === 0 ?
                   (
                     <tr>
-                      <td colSpan={7} className='py-10'>
+                      <td colSpan={8} className='py-10'>
                         <PlantLoading size='2xl' variant='pulse' text="Loading records" />
                       </td>
                     </tr>
@@ -210,7 +214,7 @@ function Records() {
                         isLoadingMore && (
                           <tr>
                             <td colSpan={8} className='py-6'>
-                              <PlantLoading size='lg' variant='pulse' text="Loading more records..." />
+                              <PlantLoading size='large' variant='pulse' text="Loading more records..." />
                             </td>
                           </tr>
                         )
