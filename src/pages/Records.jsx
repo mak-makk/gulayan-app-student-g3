@@ -25,8 +25,38 @@ function Records() {
     // TODO search from the the backend; in case that all records is not yet loaded
   }
   const handleLoadRecords = async (page = 1, append = false) => {
-    //TODO: load the data from the database
-    //TODO: implement paginated data loading
+    try {
+      setIsLoading(page === 1);
+      setIsLoadingMore(append);
+      
+      const response = await api.get('/plants', {
+        params: {
+          page,
+          per_page: 10
+        }
+      });
+      
+      const newRecords = response.data.data || response.data;
+      
+      if (append) {
+        setRecords(prev => [...prev, ...newRecords]);
+      } else {
+        setRecords(newRecords);
+      }
+      
+      // Check if there are more records to load
+      const totalPages = response.data.last_page || response.data.meta?.last_page;
+      const currentPageNum = response.data.current_page || page;
+      setHasMore(currentPageNum < totalPages);
+      setCurrentPage(currentPageNum);
+      
+    } catch (error) {
+      console.error("Error loading records:", error);
+      toast.error("Error loading records.");
+    } finally {
+      setIsLoading(false);
+      setIsLoadingMore(false);
+    }
   }
   const handleAddRecord = async (formData) => {
     try {
