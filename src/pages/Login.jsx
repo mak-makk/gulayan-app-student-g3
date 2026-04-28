@@ -9,6 +9,8 @@ function Login() {
     password: '',
     rememberMe: false
   })
+  const [loading, setLoading] = useState(false)
+  const [error, setError] = useState(null)
 
   const handleChange = (e) => {
     const { name, value, type, checked } = e.target
@@ -20,8 +22,28 @@ function Login() {
 
   const handleSubmit = async (e) => {
     e.preventDefault()
-    //TODO make the login process functional
-
+    setLoading(true)
+    setError(null)
+    
+    try {
+      const response = await api.post('/auth/login', {
+        email: formData.email,
+        password: formData.password
+      })
+      
+      // Store the token  
+      if (response.data.token) {
+        localStorage.setItem('token', response.data.token)
+      }
+      
+      // Navigate to dashboard
+      navigate('/dashboard')
+    } catch (err) {
+      setError(err.message || 'Login failed. Please try again.')
+      console.error('Login error:', err)
+    } finally {
+      setLoading(false)
+    }
   }
 
   return (
@@ -83,15 +105,38 @@ function Login() {
               />
             </div>
 
+            {/* Remember Me Checkbox */}
+            <div className="flex items-center">
+              <input
+                type="checkbox"
+                id="rememberMe"
+                name="rememberMe"
+                checked={formData.rememberMe}
+                onChange={handleChange}
+                className="h-4 w-4 text-green-600 focus:ring-green-500 border-gray-300 rounded"
+              />
+              <label htmlFor="rememberMe" className="ml-2 block text-sm text-gray-700">
+                Remember me
+              </label>
+            </div>
+
+            {/* Error Message */}
+            {error && (
+              <div className="bg-red-50 border border-red-200 text-red-600 px-4 py-3 rounded-lg text-sm">
+                {error}
+              </div>
+            )}
+
             {/* Submit Button */}
-            {/* TODO disable and show loading icon while logging in. */}
             <button
               type="submit"
+              disabled={loading}
               className="w-full bg-green-600 text-white py-3 rounded-lg font-semibold 
                             hover:bg-green-700 focus:outline-none focus:ring-2 focus:ring-green-500 
-                            focus:ring-offset-2 transition duration-200 shadow-md"
+                            focus:ring-offset-2 transition duration-200 shadow-md disabled:opacity-50 
+                            disabled:cursor-not-allowed"
             >
-              Sign In
+              {loading ? 'Signing In...' : 'Sign In'}
             </button>
           </form>
 
@@ -106,20 +151,19 @@ function Login() {
           </div>
 
           {/* Sign Up Link */}
-          {/* TODO disable sign up link while logging in */}
           <p className="mt-6 text-center text-sm text-gray-600">
             Don't have an account?{' '}
             <button
               onClick={() => navigate('/signup')}
-              className="cursor-pointer text-green-600 hover:text-green-700 font-semibold">
-              Sign up for free
+              disabled={loading}
+              className="cursor-pointer text-green-600 hover:text-green-700 font-semibold disabled:opacity-50">
+              Sign Up
             </button>
           </p>
         </div>
 
         {/* Footer */}
         <p className="text-center text-xs text-gray-500 mt-6">
-          By signing in, you agree to our{' '}
           <a href="#" className="text-green-600 hover:underline">Terms of Service</a>
           {' '}and{' '}
           <a href="#" className="text-green-600 hover:underline">Privacy Policy</a>

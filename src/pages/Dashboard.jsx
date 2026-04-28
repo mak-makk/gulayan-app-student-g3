@@ -1,10 +1,13 @@
 import { useEffect, useState } from "react";
 import { FaLeaf, FaUsers, FaBoxOpen, FaChartLine } from "react-icons/fa";
-import axios from "axios";
+import { api } from "../api";
 
 function Dashboard() {
  
   const [plants, setPlants] = useState([]);
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState(null);
+
   const stats = [
     {
       title: "Total Plants",
@@ -22,7 +25,21 @@ function Dashboard() {
 
 
   useEffect(() => {
-    // TODO fetch plants data from server
+    const fetchPlants = async () => {
+      setLoading(true);
+      setError(null);
+      try {
+        const response = await api.get("/plants");
+        setPlants(response.data);
+      } catch (err) {
+        setError(err.message || "Failed to fetch plants data");
+        console.error("Error fetching plants:", err);
+      } finally {
+        setLoading(false);
+      }
+    };
+
+    fetchPlants();
   }, []);
 
   return (
@@ -70,7 +87,7 @@ function Dashboard() {
                   Estimated Count
                 </th>
                 <th className="text-left py-3 px-4 text-sm font-semibold text-gray-700">
-                  Date Planted
+                
                 </th>
               </tr>
             </thead>
